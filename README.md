@@ -1,39 +1,43 @@
-# Production-Ready Node.js Base Backend Template (TypeScript Edition)
+# Production-Ready Express & TypeScript API Starter
 
-This repository is a clean, production-ready, and highly scalable **Base Backend Template** built with **TypeScript**, Express, Prisma, Redis/Valkey, Socket.io, BullMQ, and Prometheus. It serves as a robust starting point for building modular, high-performance APIs.
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![Express](https://img.shields.io/badge/Express-5.x-lightgrey?logo=express)](https://expressjs.com/)
+[![Prisma](https://img.shields.io/badge/Prisma-6.x-blueviolet?logo=prisma)](https://www.prisma.io/)
+[![Redis](https://img.shields.io/badge/Redis-Valkey-red?logo=redis)](https://redis.io/)
+[![Vitest](https://img.shields.io/badge/Vitest-4.x-green?logo=vitest)](https://vitest.dev/)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub--Actions-blue?logo=github-actions)](.github/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
----
-
-## 🚀 Key Features
-
-*   **🔒 Auth & Session Management**:
-    *   JWT-based session authentication with Access/Refresh token rotation.
-    *   Refresh token reuse detection & immediate multi-session invalidation.
-    *   OAuth integration out-of-the-box (Google, GitHub) via Passport.
-    *   Secure cookie handling (`HttpOnly`, `Secure`, `SameSite`).
-*   **📊 Advanced Observability & Telemetry**:
-    *   **Trace ID Propagation**: Automatic tracing from HTTP requests through event emissions and database transactions using native `AsyncLocalStorage` (no manual `traceId` argument passing).
-    *   **Prometheus Metrics**: Built-in `/metrics` endpoint tracking API durations, error ratios, database transaction profiles, and Redis cache hit ratios.
-    *   **Structured Logging**: Winston-based log rotating mechanism writing formatted logs.
-*   **📡 Distributed Event Bus & Sockets**:
-    *   **Dual-Mode Event Bus**: Gracefully routes local node events or distributes them horizontally across server clusters using Redis Pub/Sub.
-    *   **Real-time Sockets**: Socket.io server integrated with the Redis adapter to support multi-instance load balancing.
-*   **📦 Async Queuing & Background Tasks**:
-    *   Generic BullMQ background worker thread framework connected to the core Redis connection.
-    *   Supports concurrency controls, retry limits with exponential backoff, and graceful shutdowns.
-*   **📧 Transactional Email Service**:
-    *   Nodemailer wrapper supporting SMTP in production.
-    *   Automatically falls back to a **Console Log Mock Mode** in local development, preventing email spamming during test sessions.
-*   **⚡ Caching Layer**:
-    *   Generic Express middleware for API response caching.
-    *   Database-level user profile cache warmups in Redis.
-*   **🛡️ Database Resiliency**:
-    *   Prisma schema organization using the schema folders preview feature (`prisma/schema/*.prisma`).
-    *   Database transactional wrapper with automatic query retries on serialization conflicts/deadlocks.
+A robust, enterprise-grade, and highly scalable **Base Backend Template** built with Express, TypeScript, Prisma, Redis/Valkey, Socket.io, BullMQ, and Prometheus.
 
 ---
 
-## 📂 Project Directory Structure
+## 🚀 Quick Start Hero
+
+Scaffold a brand-new project instantly from this template without cloning manually:
+
+```bash
+npx @aditya3012singh/create-base-backend
+```
+*Select the **TypeScript Edition** inside the interactive prompt, and it will clone, rename, and install everything for you.*
+
+---
+
+## 💎 Core Architecture & Features
+
+| Feature | Description | Stack |
+| :--- | :--- | :--- |
+| **🔒 Secure Authentication** | JWT Access/Refresh token rotation, automatic token reuse invalidation, and failed login attempts account lockouts. | `bcrypt`, `jsonwebtoken` |
+| **📊 Tracing & Telemetry** | Flat structured JSON logs linked to request trace IDs propagating automatically across async actions using native `AsyncLocalStorage`. | `winston`, `AsyncLocalStorage` |
+| **🛡️ Database Resiliency** | Automatic database connection state diagnostics and custom query execution wrappers that auto-retry queries on deadlocks. | `prisma` |
+| **📡 Distributed Event Bus** | Dual-mode bus routing events locally on a single node or distributing them horizontally across clusters. | Redis Pub/Sub |
+| **📦 Async Queue Workers** | Dedicated async job processors handling heavy workloads in background threads with retry limits and backoffs. | `bullmq` |
+| **🧪 Testing Framework** | Complete test suites with type-safe mocked databases and request integrations. | `vitest`, `supertest` |
+| **📖 Live API Specs** | Interactive API testing documentation served directly on the server. | Swagger UI (`/docs`) |
+
+---
+
+## 📂 Directory Layout
 
 ```text
 ├── .github/                 # GitHub workflows configuration
@@ -81,130 +85,106 @@ This repository is a clean, production-ready, and highly scalable **Base Backend
 
 ---
 
-## 🛠️ Getting Started
+## 🛠️ Local Development Setup
 
 ### 1. Prerequisites
-Ensure you have the following installed locally:
-*   [Node.js](https://nodejs.org/) (v20+)
-*   [PostgreSQL](https://www.postgresql.org/)
-*   [Redis](https://redis.io/) (or Valkey)
+Ensure you have these installed:
+- [Node.js](https://nodejs.org/) (v20+)
+- [PostgreSQL](https://www.postgresql.org/)
+- [Redis](https://redis.io/)
 
-### 2. Installation
-Clone the workspace and run the following in the project root:
+### 2. Configure Environment variables
+Copy `.env.example` to create your local config file:
 ```bash
-npm install
+cp .env.example .env
 ```
+Update `.env` with your database credentials, Redis host, and keys.
 
-### 3. Environment Configuration
-Copy `.env` to configure your environment variables:
+### 3. Initialize Database
+Build your database tables and seed sample data:
 ```bash
-cp .env .env.development
-```
-Edit the `.env.development` file to include your database connection details, Redis settings, OAuth keys, and SMTP server credentials.
-
-### 4. Database Setup & Client Generation
-Build the database tables and compile the local Prisma Client:
-```bash
-# Generate the Prisma client
+# Generate database client
 npx prisma generate
 
-# Apply migrations and build schema locally
+# Apply migrations
 npx prisma migrate dev
 
-# Seed baseline data (Admin user)
+# Seed baseline database records
 npx prisma db seed
 ```
 
-### 5. Running the Application
-
-To run the main API server in development mode (watches TS files using tsx):
+### 4. Running App
 ```bash
+# Start API in hot-reload watch mode
 npm run dev
-```
 
-To run the background queue worker process in development mode:
-```bash
+# Start background queue workers
 npm run worker
-```
 
-To compile the TypeScript project:
-```bash
+# Build production distribution bundles
 npm run build
 ```
 
-### 6. Running Tests
-This template is configured with **Vitest** for testing and **vitest-mock-extended** for type-safe Prisma database mocking.
+---
 
-To run the test suite once:
+## 🧪 Testing & Code Quality
+
+Vitest tests run completely isolated without making queries to your active databases:
+
 ```bash
+# Run tests once
 npm run test
-```
 
-To run tests in watch mode during development:
-```bash
+# Run tests in watch mode
 npm run test:watch
-```
 
-To generate a test coverage report:
-```bash
+# Generate statements & branch coverage report
 npm run test:coverage
 ```
 
-### 7. Helper Scripts
-You can seed test users or administrative accounts from the command line:
-```bash
-# Seed an Admin User
-npx tsx scripts/create_admin.ts
-
-# Seed Test Users
-npx tsx scripts/create_test_user.ts
-```
-
 ---
 
-## 📖 API Documentation (Swagger)
+## 🧹 Cleaning Up & Customizing
 
-An interactive **Swagger/OpenAPI 3.0** dashboard is automatically exposed:
-- **Route**: `http://localhost:4000/docs` (or your configured port).
-- Covers endpoint shapes, Zod input validation schemas, cookie and bearer authorization settings, and HTTP response objects.
+Since this is a starter template, you might want to remove the sample modules to build your own business logic. Here is how to clean it up:
 
----
+### 1. Remove the Example Auth Module
+If you want to build your own authentication or strip it completely:
+- Delete the folder: `src/modules/auth/`
+- Remove the Auth routes mounting in `src/app.ts`:
+  - Delete `import AuthRouter from './modules/auth/auth.routes.js';`
+  - Delete `app.use('/api/auth', AuthRouter);`
+- Delete the auth passport configurations inside `src/core/config/passport.ts`.
 
-## 🤖 CI/CD Pipeline (GitHub Actions)
+### 2. Reset the Database Schemas
+- Delete `prisma/schema/user.prisma` (keeps only `config.prisma` configuration baseline).
+- Reset the local migrations:
+  ```bash
+  npx prisma migrate reset
+  ```
 
-A pre-configured GitHub Actions pipeline is defined in `.github/workflows/ci.yml`.
-It triggers on every push or pull request to the `main` branch, running:
-1. Node.js environment setup and dependencies caching.
-2. Prisma client compilation.
-3. Strict TypeScript compile checks (`tsc --noEmit`).
-4. Complete test suite execution.
+### 3. Clear Seeding Routine
+- Update `prisma/seed.ts` to remove the default admin and test user seed records.
 
 ---
 
 ## 🚀 Production Deployment
 
 ### PM2 Process Manager
-Deploy both the API server load balancer and the background worker process using the PM2 configurations (runs from `dist/` build):
+Launch the load balancer and worker queue processes simultaneously:
 ```bash
-# First build the JS files
+# Compile TS files to dist/ JS
 npm run build
 
-# Start PM2 process daemon
+# Start PM2 daemon
 pm2 start ecosystem.config.cjs
 ```
-This spawns:
-*   `base-backend-ts-api` (API node)
-*   `base-backend-ts-worker` (Async task worker queue runner)
 
-### Docker Build
-A multi-stage container build is defined in the [Dockerfile](file:///d:/Projects/base-backend/backend-ts-starter/Dockerfile):
+### Docker
 ```bash
-# Build the production image
+# Build production image
 docker build -t base-backend-ts:latest .
 
-# Run the container
+# Launch container
 docker run -d -p 4000:4000 --env-file .env.production base-backend-ts:latest
 ```
-
-### Nginx Proxy Config
-Use the provided [nginx.conf](file:///d:/Projects/base-backend/backend-ts-starter/deploy/nginx.conf) setup to proxy traffic from port 80/443 to the backend API instance, supporting active WebSocket handshakes and rate-limiting rules.
