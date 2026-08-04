@@ -36,6 +36,9 @@ This repository is a clean, production-ready, and highly scalable **Base Backend
 ## 📂 Project Directory Structure
 
 ```text
+├── .github/                 # GitHub workflows configuration
+│   └── workflows/
+│       └── ci.yml           # Standalone automated CI/CD pipeline
 ├── deploy/                  # Deployment assets (Nginx config, etc.)
 ├── prisma/                  # Database modeling
 │   ├── schema/              # Modular Prisma schema folder
@@ -43,6 +46,9 @@ This repository is a clean, production-ready, and highly scalable **Base Backend
 │   │   └── user.prisma      # Core User and Auth schema
 │   └── seed.ts              # Standard database seeding routine
 ├── src/                     # Core Application Source Code
+│   ├── __tests__/           # Test Suite Utilities
+│   │   └── helpers/
+│   │       └── prisma.mock.ts # Type-safe database mocking layer
 │   ├── api/                 # Express Layer
 │   │   ├── middleware/      # Auth validation, Rate limits, Timeout guards, Trace ID tracking
 │   │   └── routes/          # Health check, Metrics, and OAuth routers
@@ -67,7 +73,9 @@ This repository is a clean, production-ready, and highly scalable **Base Backend
 ├── Dockerfile               # Production multi-stage Docker build config
 ├── ecosystem.config.cjs     # PM2 production multi-process daemon config
 ├── tsconfig.json            # TypeScript Compiler configuration
-└── package.json             # base template dependencies
+├── package.json             # Base template dependencies
+├── .env.example             # Local configuration template environment variables
+└── vitest.config.ts         # Testing suite execution rules config
 ```
 
 ---
