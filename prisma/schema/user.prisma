@@ -1,0 +1,31 @@
+model User {
+  id                    String        @id @default(uuid())
+  username              String        @unique
+  email                 String        @unique
+  password              String
+  role                  Role          @default(USER)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  // Profile Settings
+  profilePic            String?
+  linkedin              String?
+  github                String?
+
+  // Refresh Token Rotation System
+  refreshTokenHash      String?
+  tokenVersion          Int           @default(0)
+
+  // Security Mechanisms (Failed Login Protection)
+  loginAttempts         Int           @default(0)
+  lockUntil             DateTime?
+  
+  // Password Reset System
+  resetPasswordToken    String?       @unique
+  resetPasswordExpires  DateTime?
+}
+
+enum Role {
+  USER
+  ADMIN
+}
