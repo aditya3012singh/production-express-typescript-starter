@@ -67,6 +67,7 @@ This repository is a clean, production-ready, and highly scalable **Base Backend
 │   │   └── socket/          # Socket.io connection bindings and middleware
 │   ├── modules/             # Business Logic Modules
 │   │   └── auth/            # Authentication routers, controllers, and schemas
+│   │       └── __tests__/   # Unit test suite cases (AuthService tests)
 │   ├── app.ts               # Application setup (middlewares and base routers)
 │   ├── index.ts             # API entrypoint
 │   └── server.ts            # Database and Cache boots, Server setup
