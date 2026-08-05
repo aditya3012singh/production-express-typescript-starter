@@ -16,7 +16,8 @@ const envSchema = z.object({
   ALLOWED_ORIGINS: z.string().optional().transform(val => val ? val.split(",") : []),
 
   // Database
-  DATABASE_URL: z.string().url(),
+  DATABASE_URL: z.string().url().optional(),
+  MONGODB_URI: z.string().url().optional(),
 
   // Redis
   REDIS_URL: z.string().transform(val => val ? substituteEnvVars(val.trim()) : val).pipe(z.string().url()).optional(),

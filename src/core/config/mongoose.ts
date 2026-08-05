@@ -15,8 +15,8 @@ class MongooseDatabase {
 
             logger.info('✅ [MongoDB] Connected to MongoDB database successfully.');
         } catch (error) {
-            logger.error('❌ [MongoDB] Connection to MongoDB failed:', error);
-            process.exit(1);
+            logger.error('❌ [MongoDB] Connection attempt to MongoDB failed:', error);
+            throw error;
         }
     }
 
