@@ -1,4 +1,4 @@
-import { Kafka, Producer, Consumer } from 'kafkajs';
+﻿import { Kafka, Producer, Consumer } from 'kafkajs';
 import logger from '../../logger/logger.js';
 import { IEventBus } from '../eventBus.interface.js';
 
@@ -6,13 +6,23 @@ export class KafkaEventBus implements IEventBus {
     private kafka?: Kafka;
     private producer?: Producer;
     private consumer?: Consumer;
+    private isConnected = false;
     private clientId = 'base-backend';
     private topicName = 'app_events';
     private brokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
 
+    async connect(): Promise<boolean> {
+        try {
+            await this.initialize();
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+
     async initialize(): Promise<void> {
         try {
-            logger.info('🔌 [Kafka] Connecting to Kafka brokers...');
+            logger.info(`🔌 [Kafka] Connecting to Kafka brokers (${this.brokers.join(', ')})...`);
             this.kafka = new Kafka({
                 clientId: this.clientId,
                 brokers: this.brokers
@@ -24,14 +34,24 @@ export class KafkaEventBus implements IEventBus {
             this.consumer = this.kafka.consumer({ groupId: 'base-backend-group' });
             await this.consumer.connect();
 
-            logger.info('✅ [Kafka] Connected successfully.');
+            this.isConnected = true;
+            logger.info('✅ [Kafka] Connected to Kafka successfully.');
         } catch (error) {
+            this.isConnected = false;
             logger.error('❌ [Kafka] Failed to connect/initialize Kafka:', error);
             throw error;
         }
     }
 
+    isHealthy(): boolean {
+        return this.isConnected;
+    }
+
     async emitEvent(eventName: string, payload: any, eventId?: string): Promise<void> {
+        return this.publish(eventName, payload, eventId);
+    }
+
+    async publish(eventName: string, payload: any, eventId?: string): Promise<void> {
         if (!this.producer) {
             throw new Error('[Kafka] Event bus producer is not initialized.');
         }
@@ -53,6 +73,10 @@ export class KafkaEventBus implements IEventBus {
     }
 
     async onEvent(eventName: string, handler: (payload: any) => Promise<void>): Promise<void> {
+        return this.subscribe(eventName, handler);
+    }
+
+    async subscribe(eventName: string, handler: (payload: any) => Promise<void>): Promise<void> {
         if (!this.consumer) {
             throw new Error('[Kafka] Event bus consumer is not initialized.');
         }
@@ -74,9 +98,36 @@ export class KafkaEventBus implements IEventBus {
         });
     }
 
+    getHealthStatus(): any {
+        return {
+            connected: this.isConnected,
+            brokers: this.brokers,
+            topic: this.topicName,
+            timestamp: new Date().toISOString()
+        };
+    }
+
+    getDeadLetterQueue(): any[] {
+        return [];
+    }
+
+    async retryDeadLetter(_index: number): Promise<boolean> {
+        return false;
+    }
+
+    clearDeadLetterQueue(): void {}
+
+    async disconnect(): Promise<void> {
+        return this.shutdown();
+    }
+
     async shutdown(): Promise<void> {
         await this.producer?.disconnect();
         await this.consumer?.disconnect();
+        this.isConnected = false;
         logger.info('🔌 [Kafka] Disconnected from Kafka.');
     }
 }
+
+const kafkaEventBus = new KafkaEventBus();
+export default kafkaEventBus;
