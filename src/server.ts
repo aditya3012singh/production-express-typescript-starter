@@ -3,7 +3,7 @@ import app from './app.js';
 import env from './core/config/env.js';
 import logger from './core/logger/logger.js';
 import RedisClient from './core/cache/redis.client.js';
-import { prisma } from './core/config/db.wrapper.js';
+import Database from './core/config/db.js';
 import dualModeEventBus from './core/events/dualModeEventBus.js';
 import { registerListeners } from './core/events/listeners/index.js';
 import SocketServer from './integrations/socket/socket.server.js';
@@ -16,15 +16,15 @@ class ServerApp {
         const start = Date.now();
 
         try {
-            // 1. Verify Database Connection (non-blocking, with 3 retries)
-            logger.info('[Database] Checking connection to postgres database...');
+            // 1. Verify Database Connection (non-blocking, with retries)
+            logger.info('[Database] Checking database connection...');
             const maxRetries = 5;
             const retryDelay = 2000;
             let connected = false;
 
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
                 try {
-                    await prisma.$connect();
+                    await Database.connect();
                     logger.info('✅ [Database] Connection verified.');
                     connected = true;
                     break;
@@ -89,8 +89,8 @@ class ServerApp {
                     // Close Event Bus
                     await dualModeEventBus.shutdown();
 
-                    // Disconnect Prisma
-                    await prisma.$disconnect();
+                    // Disconnect Database
+                    await Database.disconnect();
                     logger.info('[Server] Database connection closed.');
 
                     logger.info('👋 Graceful shutdown complete.');
