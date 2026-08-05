@@ -1,8 +1,8 @@
-import { NextFunction, Request, Response } from 'express';
+﻿import { NextFunction, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import env from '../../core/config/env.js';
-import DBWrapper from '../../core/config/db.wrapper.js';
+import userRepository from './repositories/user.repository.js';
 import UserCache from '../../core/cache/userCache.js';
 import CacheManager from '../../core/cache/cacheManager.js';
 import S3Service from '../../integrations/s3/s3.service.js';
@@ -28,33 +28,19 @@ class AuthController {
         try {
             const body = registerSchema.parse(req.body);
 
+            const existing = await userRepository.findByEmailOrUsername(body.email, body.username);
+            if (existing) {
+                const err = new Error('Username or email is already registered.');
+                (err as any).statusCode = 409;
+                throw err;
+            }
+
             const hashedPassword = await bcrypt.hash(body.password, 12);
 
-            const user = await DBWrapper.execute('authRegisterUser', async (db) => {
-                const existing = await db.user.findFirst({
-                    where: { OR: [{ email: body.email }, { username: body.username }] }
-                });
-
-                if (existing) {
-                    const err = new Error('Username or email is already registered.');
-                    (err as any).statusCode = 409;
-                    throw err;
-                }
-
-                return db.user.create({
-                    data: {
-                        username: body.username,
-                        email: body.email,
-                        password: hashedPassword
-                    },
-                    select: {
-                        id: true,
-                        username: true,
-                        email: true,
-                        role: true,
-                        createdAt: true
-                    }
-                });
+            const user = await userRepository.create({
+                username: body.username,
+                email: body.email,
+                password: hashedPassword
             });
 
             // Emit registration event
@@ -64,7 +50,13 @@ class AuthController {
                 username: user.username
             });
 
-            res.created?.(user, 'User registered successfully.');
+            res.created?.({
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                role: user.role,
+                createdAt: user.createdAt
+            }, 'User registered successfully.');
         } catch (error) {
             next(error);
         }
@@ -77,11 +69,7 @@ class AuthController {
         try {
             const body = loginSchema.parse(req.body);
 
-            const user = await DBWrapper.execute('authFindUserForLogin', (db) =>
-                db.user.findUnique({
-                    where: { email: body.email }
-                })
-            );
+            const user = await userRepository.findByEmail(body.email);
 
             if (!user) {
                 const err = new Error('Invalid email or password.');
@@ -100,18 +88,11 @@ class AuthController {
             const isPasswordValid = await bcrypt.compare(body.password, user.password);
 
             if (!isPasswordValid) {
-                // Increment failed attempts
-                await DBWrapper.execute('authIncrementFailedAttempts', (db) => {
-                    const attempts = user.loginAttempts + 1;
-                    const lockTime = attempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : null; // 15 mins lock
-
-                    return db.user.update({
-                        where: { id: user.id },
-                        data: {
-                            loginAttempts: attempts,
-                            ...(lockTime ? { lockUntil: lockTime } : {})
-                        }
-                    });
+                const attempts = user.loginAttempts + 1;
+                const lockTime = attempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : null;
+                await userRepository.update(user.id, {
+                    loginAttempts: attempts,
+                    ...(lockTime ? { lockUntil: lockTime } : {})
                 });
 
                 const err = new Error('Invalid email or password.');
@@ -135,16 +116,11 @@ class AuthController {
             const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
 
             // Save token hash & reset locks
-            await DBWrapper.execute('authUpdateTokensAndResetAttempts', (db) =>
-                db.user.update({
-                    where: { id: user.id },
-                    data: {
-                        refreshTokenHash,
-                        loginAttempts: 0,
-                        lockUntil: null
-                    }
-                })
-            );
+            await userRepository.update(user.id, {
+                refreshTokenHash,
+                loginAttempts: 0,
+                lockUntil: null
+            });
 
             // Register cookies
             res.cookie('refreshToken', refreshToken, COOKIE_OPTIONS);
@@ -191,11 +167,7 @@ class AuthController {
                 throw error;
             }
 
-            const user = await DBWrapper.execute('authFindUserForRefresh', (db) =>
-                db.user.findUnique({
-                    where: { id: decoded.id }
-                })
-            );
+            const user = await userRepository.findById(decoded.id);
 
             if (!user || !user.refreshTokenHash) {
                 const err = new Error('Session not found.');
@@ -207,16 +179,11 @@ class AuthController {
             const isMatch = await bcrypt.compare(refreshToken, user.refreshTokenHash);
 
             if (!isMatch) {
-                // Invalidate all user sessions
-                await DBWrapper.execute('authInvalidateAllSessionsOnConflict', (db) =>
-                    db.user.update({
-                        where: { id: user.id },
-                        data: {
-                            refreshTokenHash: null,
-                            tokenVersion: { increment: 1 }
-                        }
-                    })
-                );
+                // Invalidate all user sessions on token reuse
+                await userRepository.update(user.id, {
+                    refreshTokenHash: null,
+                    tokenVersion: (user.tokenVersion ?? 0) + 1
+                });
 
                 res.clearCookie('refreshToken', COOKIE_OPTIONS);
                 const err = new Error('Security alert: Refresh token reuse detected. All sessions terminated.');
@@ -239,12 +206,7 @@ class AuthController {
 
             const newRefreshTokenHash = await bcrypt.hash(newRefreshToken, 10);
 
-            await DBWrapper.execute('authUpdateNewRefreshToken', (db) =>
-                db.user.update({
-                    where: { id: user.id },
-                    data: { refreshTokenHash: newRefreshTokenHash }
-                })
-            );
+            await userRepository.update(user.id, { refreshTokenHash: newRefreshTokenHash });
 
             res.cookie('refreshToken', newRefreshToken, COOKIE_OPTIONS);
 
@@ -262,12 +224,7 @@ class AuthController {
             const userId = req.userId;
 
             if (userId) {
-                await DBWrapper.execute('authLogoutClearHash', (db) =>
-                    db.user.update({
-                        where: { id: userId },
-                        data: { refreshTokenHash: null }
-                    })
-                );
+                await userRepository.update(userId, { refreshTokenHash: null });
             }
 
             res.clearCookie('refreshToken', COOKIE_OPTIONS);
@@ -310,20 +267,7 @@ class AuthController {
         try {
             const username = req.params.username as string;
 
-            const user = await DBWrapper.execute('authGetPublicProfile', (db) =>
-                db.user.findUnique({
-                    where: { username },
-                    select: {
-                        id: true,
-                        username: true,
-                        role: true,
-                        createdAt: true,
-                        profilePic: true,
-                        linkedin: true,
-                        github: true
-                    }
-                })
-            );
+            const user = await userRepository.findByUsername(username);
 
             if (!user) {
                 const err = new Error('User not found.');
@@ -331,7 +275,17 @@ class AuthController {
                 throw err;
             }
 
-            res.ok?.({ user }, 'Public profile fetched successfully.');
+            res.ok?.({
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    role: user.role,
+                    createdAt: user.createdAt,
+                    profilePic: user.profilePic,
+                    linkedin: user.linkedin,
+                    github: user.github
+                }
+            }, 'Public profile fetched successfully.');
         } catch (error) {
             next(error);
         }
@@ -360,24 +314,20 @@ class AuthController {
                 }
             }
 
-            const updatedUser = await DBWrapper.execute('authUpdateProfileFields', (db) =>
-                db.user.update({
-                    where: { id: userId },
-                    data: dataToUpdate,
-                    select: {
-                        id: true,
-                        username: true,
-                        email: true,
-                        profilePic: true,
-                        linkedin: true,
-                        github: true
-                    }
-                })
-            );
+            const updatedUser = await userRepository.update(userId, dataToUpdate);
 
             await CacheManager.handleUserUpdate(userId);
 
-            res.ok?.({ user: updatedUser }, 'Profile settings updated successfully.');
+            res.ok?.({
+                user: {
+                    id: updatedUser.id,
+                    username: updatedUser.username,
+                    email: updatedUser.email,
+                    profilePic: updatedUser.profilePic,
+                    linkedin: updatedUser.linkedin,
+                    github: updatedUser.github
+                }
+            }, 'Profile settings updated successfully.');
         } catch (error) {
             next(error);
         }
@@ -474,9 +424,7 @@ class AuthController {
                 throw err;
             }
 
-            const user = await DBWrapper.execute('authChangePasswordGetUser', (db) =>
-                db.user.findUnique({ where: { id: userId } })
-            );
+            const user = await userRepository.findById(userId);
 
             if (!user) {
                 const err = new Error('User not found.');
@@ -498,12 +446,7 @@ class AuthController {
             }
 
             const hashedPassword = await bcrypt.hash(newPassword, 12);
-            await DBWrapper.execute('authChangePasswordUpdate', (db) =>
-                db.user.update({
-                    where: { id: userId },
-                    data: { password: hashedPassword }
-                })
-            );
+            await userRepository.update(userId, { password: hashedPassword });
 
             res.ok?.({}, 'Password updated successfully.');
         } catch (error) {
@@ -536,12 +479,7 @@ class AuthController {
 
             const hashedToken = await bcrypt.hash(refreshToken, 10);
 
-            await DBWrapper.execute('authSocialSetRefreshToken', (db) =>
-                db.user.update({
-                    where: { id: user.id },
-                    data: { refreshTokenHash: hashedToken }
-                })
-            );
+            await userRepository.update(user.id, { refreshTokenHash: hashedToken });
 
             const { state } = req.query as { state?: string };
             let redirectTo = '/';

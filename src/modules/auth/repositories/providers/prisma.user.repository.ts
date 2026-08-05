@@ -14,6 +14,20 @@ export class PrismaUserRepository implements IUserRepository {
         );
     }
 
+    async findByUsername(username: string): Promise<any | null> {
+        return DBWrapper.execute('userRepoFindByUsername', (db) =>
+            db.user.findUnique({ where: { username } })
+        );
+    }
+
+    async findByEmailOrUsername(email: string, username: string): Promise<any | null> {
+        return DBWrapper.execute('userRepoFindByEmailOrUsername', (db) =>
+            db.user.findFirst({
+                where: { OR: [{ email }, { username }] }
+            })
+        );
+    }
+
     async findByResetToken(token: string): Promise<any | null> {
         return DBWrapper.execute('userRepoFindByResetToken', (db) =>
             db.user.findFirst({
@@ -45,6 +59,21 @@ export class PrismaUserRepository implements IUserRepository {
             db.user.update({
                 where: { email },
                 data
+            })
+        );
+    }
+
+    async findOrCreateOAuthUser(data: { email: string; username: string; profilePic?: string }): Promise<any> {
+        return DBWrapper.execute('userRepoFindOrCreateOAuth', (db) =>
+            db.user.upsert({
+                where: { email: data.email },
+                update: { profilePic: data.profilePic },
+                create: {
+                    username: data.username,
+                    email: data.email,
+                    password: '',
+                    profilePic: data.profilePic
+                }
             })
         );
     }

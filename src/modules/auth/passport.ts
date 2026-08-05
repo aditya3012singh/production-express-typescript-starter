@@ -2,7 +2,7 @@ import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as GitHubStrategy } from 'passport-github2';
 import env from '../../core/config/env.js';
-import DBWrapper from '../../core/config/db.wrapper.js';
+import userRepository from './repositories/user.repository.js';
 
 // Configure Google Strategy if credentials exist
 if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
@@ -16,18 +16,11 @@ if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
             const email = profile.emails?.[0]?.value;
             if (!email) return done(new Error('No email found in Google profile'));
 
-            const user = await DBWrapper.execute('oauthGoogleUpsert', (db) => 
-                db.user.upsert({
-                    where: { email },
-                    update: { profilePic: profile.photos?.[0]?.value },
-                    create: {
-                        username: `google_${profile.id}`,
-                        email,
-                        password: '', // Password not required for OAuth users
-                        profilePic: profile.photos?.[0]?.value
-                    }
-                })
-            );
+            const user = await userRepository.findOrCreateOAuthUser({
+                email,
+                username: `google_${profile.id}`,
+                profilePic: profile.photos?.[0]?.value
+            });
 
             return done(null, user as any);
         } catch (err: any) {
@@ -48,18 +41,11 @@ if (env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) {
             const email = profile.emails?.[0]?.value;
             if (!email) return done(new Error('No email found in GitHub profile'));
 
-            const user = await DBWrapper.execute('oauthGithubUpsert', (db) =>
-                db.user.upsert({
-                    where: { email },
-                    update: { profilePic: profile.photos?.[0]?.value },
-                    create: {
-                        username: profile.username || `github_${profile.id}`,
-                        email,
-                        password: '',
-                        profilePic: profile.photos?.[0]?.value
-                    }
-                })
-            );
+            const user = await userRepository.findOrCreateOAuthUser({
+                email,
+                username: profile.username || `github_${profile.id}`,
+                profilePic: profile.photos?.[0]?.value
+            });
 
             return done(null, user as any);
         } catch (err: any) {

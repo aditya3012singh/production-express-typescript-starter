@@ -10,6 +10,14 @@ export class MongooseUserRepository implements IUserRepository {
         return UserModel.findOne({ email }).exec();
     }
 
+    async findByUsername(username: string): Promise<any | null> {
+        return UserModel.findOne({ username }).exec();
+    }
+
+    async findByEmailOrUsername(email: string, username: string): Promise<any | null> {
+        return UserModel.findOne({ $or: [{ email }, { username }] }).exec();
+    }
+
     async findByResetToken(token: string): Promise<any | null> {
         return UserModel.findOne({
             resetPasswordToken: token,
@@ -28,5 +36,16 @@ export class MongooseUserRepository implements IUserRepository {
 
     async updateByEmail(email: string, data: any): Promise<any> {
         return UserModel.findOneAndUpdate({ email }, data, { new: true }).exec();
+    }
+
+    async findOrCreateOAuthUser(data: { email: string; username: string; profilePic?: string }): Promise<any> {
+        return UserModel.findOneAndUpdate(
+            { email: data.email },
+            {
+                $setOnInsert: { username: data.username, password: '' },
+                $set: { profilePic: data.profilePic }
+            },
+            { upsert: true, new: true }
+        ).exec();
     }
 }
