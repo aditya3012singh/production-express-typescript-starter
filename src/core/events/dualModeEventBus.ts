@@ -4,7 +4,9 @@ import logger from '../logger/logger.js';
 import structuredLogger from '../logger/structuredLogger.js';
 import metricsCollector from '../metrics/metricsCollector.js';
 
-class DualModeEventBus {
+import { IEventBus } from './eventBus.interface.js';
+
+class DualModeEventBus implements IEventBus {
     private localBus = eventBus;
     private distributedBus = redisEventBus;
     public mode: 'local' | 'distributed' | 'dual' = 'dual';

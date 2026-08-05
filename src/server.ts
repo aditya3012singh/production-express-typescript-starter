@@ -6,7 +6,6 @@ import RedisClient from './core/cache/redis.client.js';
 import { prisma } from './core/config/db.wrapper.js';
 import dualModeEventBus from './core/events/dualModeEventBus.js';
 import { registerListeners } from './core/events/listeners/index.js';
-import UserCache from './core/cache/userCache.js';
 import SocketServer from './integrations/socket/socket.server.js';
 
 class ServerApp {
@@ -17,10 +16,30 @@ class ServerApp {
         const start = Date.now();
 
         try {
-            // 1. Verify Database Connection
+            // 1. Verify Database Connection (non-blocking, with 3 retries)
             logger.info('[Database] Checking connection to postgres database...');
-            await prisma.$connect();
-            logger.info('✅ [Database] Connection verified.');
+            const maxRetries = 5;
+            const retryDelay = 2000;
+            let connected = false;
+
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    await prisma.$connect();
+                    logger.info('✅ [Database] Connection verified.');
+                    connected = true;
+                    break;
+                } catch (dbError: any) {
+                    logger.warn(`⚠️ [Database] Connection attempt ${attempt}/${maxRetries} failed: ${dbError.message}`);
+                    if (attempt < maxRetries) {
+                        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+                    }
+                }
+            }
+
+            if (!connected) {
+                logger.error('❌ [Database] All connection attempts failed.');
+                logger.warn('⚠️ [Database] Continuing boot without active database connection.');
+            }
 
             // 2. Initialize Redis Connection
             RedisClient.initialize();
@@ -30,11 +49,6 @@ class ServerApp {
             
             // Register event listeners
             registerListeners(dualModeEventBus);
-
-            // 4. Cache Warmup (async, non-blocking)
-            UserCache.warmUp().catch(err => {
-                logger.error('❌ [Cache] Warmup failed:', err);
-            });
 
             // 5. Initialize HTTP Server & Sockets
             this.server = http.createServer(app);

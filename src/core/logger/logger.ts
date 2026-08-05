@@ -19,7 +19,7 @@ const logger = winston.createLogger({
     format: combine(
         timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
         errors({ stack: true }), // Automatically capture stacks
-        process.env.NODE_ENV === 'production' ? json() : consoleFormat
+        json()
     ),
     transports: [
         new winston.transports.Console(),

@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
-import DBWrapper from '../../core/config/db.wrapper.js';
+import userRepository from './repositories/user.repository.js';
 import env from '../../core/config/env.js';
 import EmailService from '../../core/email/email.service.js';
 
@@ -18,9 +18,7 @@ class AuthService {
      * Generate password reset token and send instructions email
      */
     static async forgotPasswordService(email: string): Promise<ForgotPasswordResult> {
-        const user = await DBWrapper.execute('authForgotGetUser', (db) =>
-            db.user.findUnique({ where: { email } })
-        );
+        const user = await userRepository.findByEmail(email);
 
         if (!user) {
             // Safe fallback response to prevent email discovery attacks
@@ -34,15 +32,10 @@ class AuthService {
         // Expiry time set to 15 minutes
         const tokenExpiry = new Date(Date.now() + 15 * 60 * 1000);
 
-        await DBWrapper.execute('authForgotSetResetToken', (db) =>
-            db.user.update({
-                where: { email },
-                data: {
-                    resetPasswordToken: hashedToken,
-                    resetPasswordExpires: tokenExpiry
-                }
-            })
-        );
+        await userRepository.updateByEmail(email, {
+            resetPasswordToken: hashedToken,
+            resetPasswordExpires: tokenExpiry
+        });
 
         // Send reset email asynchronously using EmailService
         const baseUrl = env.FRONTEND_URL.endsWith('/') ? env.FRONTEND_URL.slice(0, -1) : env.FRONTEND_URL;
@@ -72,14 +65,7 @@ class AuthService {
     static async resetPasswordService(token: string, newPassword: string): Promise<ResetPasswordResult> {
         const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
-        const user = await DBWrapper.execute('authResetGetByToken', (db) =>
-            db.user.findFirst({
-                where: {
-                    resetPasswordToken: hashedToken,
-                    resetPasswordExpires: { gte: new Date() }
-                }
-            })
-        );
+        const user = await userRepository.findByResetToken(hashedToken);
 
         if (!user) {
             const err = new Error('Token is invalid or has expired.');
@@ -89,16 +75,11 @@ class AuthService {
 
         const hashedPassword = await bcrypt.hash(newPassword, 12);
 
-        await DBWrapper.execute('authResetUpdatePassword', (db) =>
-            db.user.update({
-                where: { id: user.id },
-                data: {
-                    password: hashedPassword,
-                    resetPasswordToken: null,
-                    resetPasswordExpires: null
-                }
-            })
-        );
+        await userRepository.update(user.id, {
+            password: hashedPassword,
+            resetPasswordToken: null,
+            resetPasswordExpires: null
+        });
 
         return { message: 'Password has been successfully reset.' };
     }
