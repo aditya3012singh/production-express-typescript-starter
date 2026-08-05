@@ -1,5 +1,5 @@
 import RedisClient from '../cache/redis.client.js';
-import { prisma } from '../config/db.wrapper.js';
+import DBWrapper from '../config/db.wrapper.js';
 import structuredLogger from '../logger/structuredLogger.js';
 
 class HealthCheckService {
@@ -57,7 +57,7 @@ class HealthCheckService {
             );
 
             await Promise.race([
-                prisma.$queryRaw`SELECT 1`,
+                DBWrapper.execute('healthCheckPing', (db) => db.$queryRaw`SELECT 1`),
                 timeoutPromise
             ]);
 

@@ -3,7 +3,6 @@ import redisEventBus from './redisEventBus.js';
 import logger from '../logger/logger.js';
 import structuredLogger from '../logger/structuredLogger.js';
 import metricsCollector from '../metrics/metricsCollector.js';
-
 import { IEventBus } from './eventBus.interface.js';
 
 class DualModeEventBus implements IEventBus {
