@@ -1,4 +1,4 @@
-﻿import amqp from 'amqplib';
+import amqp from 'amqplib';
 import logger from '../../logger/logger.js';
 import { IEventBus } from '../eventBus.interface.js';
 
@@ -70,7 +70,10 @@ export class RabbitMQEventBus implements IEventBus {
             throw new Error('[RabbitMQ] Event bus channel is not initialized.');
         }
 
-        const queueName = `q_${eventName}`;
+        const appName = process.env.APP_NAME || 'base-backend';
+        const handlerIdentifier = handler.name || 'default';
+        const queueName = `q_${eventName}_${appName}_${handlerIdentifier}`;
+        
         await this.channel.assertQueue(queueName, { durable: true });
         await this.channel.bindQueue(queueName, this.exchangeName, eventName);
 

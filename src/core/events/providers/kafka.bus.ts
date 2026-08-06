@@ -1,4 +1,4 @@
-﻿import { Kafka, Producer, Consumer } from 'kafkajs';
+import { Kafka, Producer, Consumer } from 'kafkajs';
 import logger from '../../logger/logger.js';
 import { IEventBus } from '../eventBus.interface.js';
 
@@ -10,6 +10,8 @@ export class KafkaEventBus implements IEventBus {
     private clientId = 'base-backend';
     private topicName = 'app_events';
     private brokers = (process.env.KAFKA_BROKERS || 'localhost:9092').split(',');
+    private handlers = new Map<string, Array<(payload: any) => Promise<void>>>();
+    private isConsuming = false;
 
     async connect(): Promise<boolean> {
         try {
@@ -81,21 +83,51 @@ export class KafkaEventBus implements IEventBus {
             throw new Error('[Kafka] Event bus consumer is not initialized.');
         }
 
+        if (!this.handlers.has(eventName)) {
+            this.handlers.set(eventName, []);
+        }
+        this.handlers.get(eventName)!.push(handler);
+
         await this.consumer.subscribe({ topic: this.topicName, fromBeginning: false });
 
-        await this.consumer.run({
-            eachMessage: async ({ message }) => {
-                try {
-                    const key = message.key?.toString();
-                    if (key === eventName && message.value) {
-                        const content = JSON.parse(message.value.toString());
-                        await handler(content.payload);
+        if (!this.isConsuming) {
+            this.isConsuming = true;
+            setTimeout(() => this.startConsumeLoop(), 100);
+        }
+    }
+
+    private async startConsumeLoop(): Promise<void> {
+        if (!this.consumer) return;
+
+        try {
+            logger.info('📊 [Kafka] Starting single consumer message loop...');
+            await this.consumer.run({
+                eachMessage: async ({ message }) => {
+                    try {
+                        const key = message.key?.toString();
+                        if (key && message.value) {
+                            const content = JSON.parse(message.value.toString());
+                            const handlers = this.handlers.get(key) || [];
+                            
+                            logger.info(`[Kafka] 📥 Received event: ${key} (dispatching to ${handlers.length} handlers)`);
+                            
+                            for (const handler of handlers) {
+                                try {
+                                    await handler(content.payload);
+                                } catch (hErr) {
+                                    logger.error(`[Kafka] ❌ Handler error for event ${key}:`, hErr);
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        logger.error('[Kafka] Error processing message:', err);
                     }
-                } catch (error) {
-                    logger.error(`[Kafka] Error handling event ${eventName}:`, error);
                 }
-            }
-        });
+            });
+        } catch (error) {
+            logger.error('[Kafka] Failed to start consumer message loop:', error);
+            this.isConsuming = false;
+        }
     }
 
     getHealthStatus(): any {

@@ -153,68 +153,81 @@ class RedisEventBus {
         }
 
         try {
-            if (!this.handlers.has(eventName)) {
+            const isFirstSubscription = !this.handlers.has(eventName);
+            if (isFirstSubscription) {
                 this.handlers.set(eventName, []);
             }
             this.handlers.get(eventName)!.push(handler);
 
-            await this.subscriber.subscribe(eventName, async (message) => {
-                let eventData: any;
-                try {
-                    eventData = JSON.parse(message);
-                    const startTime = Date.now();
-                    
-                    if (this.isEventProcessed(eventData.eventId)) {
-                        logger.warn(`[RedisEventBus] ⚠️ Duplicate event detected: ${eventData.eventId}`);
-                        structuredLogger.warn('Duplicate event detected', {
-                            traceId: eventData.eventId,
-                            eventName,
-                            eventId: eventData.eventId
+            if (isFirstSubscription) {
+                await this.subscriber.subscribe(eventName, async (message) => {
+                    let eventData: any;
+                    try {
+                        eventData = JSON.parse(message);
+                        const startTime = Date.now();
+                        
+                        if (this.isEventProcessed(eventData.eventId)) {
+                            logger.warn(`[RedisEventBus] ⚠️ Duplicate event detected: ${eventData.eventId}`);
+                            structuredLogger.warn('Duplicate event detected', {
+                                traceId: eventData.eventId,
+                                eventName,
+                                eventId: eventData.eventId
+                            });
+                            return;
+                        }
+
+                        this.markEventProcessed(eventData.eventId);
+
+                        structuredLogger.logEventReceived(eventData.eventId, eventName, eventData.eventId, {
+                            source: eventData.source
                         });
-                        return;
+
+                        logger.info(`[RedisEventBus] 📥 Received: ${eventName}`, {
+                            eventId: eventData.eventId,
+                            source: eventData.source
+                        });
+
+                        const handlers = this.handlers.get(eventName) || [];
+                        for (const h of handlers) {
+                            try {
+                                const hStartTime = Date.now();
+                                await h(eventData.payload);
+                                const duration = Date.now() - hStartTime;
+
+                                structuredLogger.logListenerExecution(eventData.eventId, eventName, h.name || 'anonymous', duration, {
+                                    source: 'redis'
+                                });
+
+                                metricsCollector.recordListenerExecution(h.name || 'anonymous', duration, false);
+                            } catch (hError: any) {
+                                logger.error(`[RedisEventBus] ❌ Handler error for event ${eventName}:`, hError);
+                                metricsCollector.recordListenerExecution(h.name || 'anonymous', 0, true);
+                            }
+                        }
+
+                        const totalDuration = Date.now() - startTime;
+                        metricsCollector.recordEventReceived(eventName);
+
+                        logger.info(`[RedisEventBus] ✅ Event processing completed: ${eventName}`, {
+                            eventId: eventData.eventId,
+                            duration: totalDuration
+                        });
+                    } catch (error: any) {
+                        logger.error(`[RedisEventBus] ❌ Error handling event: ${eventName}`, error);
+                        
+                        structuredLogger.logError(eventData?.eventId || 'unknown', `Error handling event: ${eventName}`, error, {
+                            eventName
+                        });
+
+                        metricsCollector.recordEventFailed(eventName);
+                        metricsCollector.recordError('EventHandlingError');
+                        
+                        this.addToDeadLetterQueue(eventName, message, error);
                     }
+                });
+            }
 
-                    this.markEventProcessed(eventData.eventId);
-
-                    structuredLogger.logEventReceived(eventData.eventId, eventName, eventData.eventId, {
-                        source: eventData.source
-                    });
-
-                    logger.info(`[RedisEventBus] 📥 Received: ${eventName}`, {
-                        eventId: eventData.eventId,
-                        source: eventData.source
-                    });
-
-                    await handler(eventData.payload);
-
-                    const duration = Date.now() - startTime;
-
-                    structuredLogger.logListenerExecution(eventData.eventId, eventName, handler.name || 'anonymous', duration, {
-                        source: 'redis'
-                    });
-
-                    metricsCollector.recordEventReceived(eventName);
-                    metricsCollector.recordListenerExecution(handler.name || 'anonymous', duration, false);
-
-                    logger.info(`[RedisEventBus] ✅ Handler completed: ${eventName}`, {
-                        eventId: eventData.eventId,
-                        duration
-                    });
-                } catch (error: any) {
-                    logger.error(`[RedisEventBus] ❌ Error handling event: ${eventName}`, error);
-                    
-                    structuredLogger.logError(eventData?.eventId || 'unknown', `Error handling event: ${eventName}`, error, {
-                        eventName
-                    });
-
-                    metricsCollector.recordEventFailed(eventName);
-                    metricsCollector.recordError('EventHandlingError');
-                    
-                    this.addToDeadLetterQueue(eventName, message, error);
-                }
-            });
-
-            logger.info(`[RedisEventBus] 📥 Subscribed to: ${eventName}`, {
+            logger.info(`[RedisEventBus] 📥 Subscribed handler to: ${eventName}`, {
                 handlerName: handler.name || 'anonymous'
             });
         } catch (error) {
