@@ -16,7 +16,7 @@ import HealthRouter from './core/health/health.routes.js';
 import healthCheckService from './core/health/healthCheck.js';
 import passport from './modules/auth/passport.js';
 import { TracedRequest } from './api/middleware/traceId.middleware.js';
-import logger from './core/logger/logger.js';
+import logger from './core/logger/structuredLogger.js';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './core/config/swagger.js';
 

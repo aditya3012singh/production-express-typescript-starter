@@ -1,4 +1,4 @@
-import logger from '../../logger/logger.js';
+import logger from '../../logger/structuredLogger.js';
 
 interface EventBusInterface {
     onEvent(eventName: string, handler: (payload: any) => Promise<void>): Promise<void>;

@@ -3,7 +3,7 @@ import { createAdapter } from '@socket.io/redis-adapter';
 import http from 'http';
 import RedisClient from '../../core/cache/redis.client.js';
 import env from '../../core/config/env.js';
-import logger from '../../core/logger/logger.js';
+import logger from '../../core/logger/structuredLogger.js';
 import SocketConfig from '../../core/config/socket.js';
 
 class SocketServer {

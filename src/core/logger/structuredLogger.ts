@@ -12,10 +12,22 @@ class StructuredLogger {
     /**
      * Log with structured flat format
      */
-    log(level: string, message: string, metadata: Record<string, any> = {}): void {
+    log(level: string, message: string, metadata: any = {}): void {
         const store = contextStorage.getStore();
-        const traceId = metadata.traceId || store?.traceId || 'system';
-        const requestId = metadata.requestId || store?.requestId;
+        
+        let formattedMeta: Record<string, any> = {};
+        if (metadata && typeof metadata === 'object') {
+            if (metadata instanceof Error) {
+                formattedMeta = { error: metadata.message, stack: metadata.stack };
+            } else {
+                formattedMeta = { ...metadata };
+            }
+        } else if (metadata !== undefined && metadata !== null) {
+            formattedMeta = { extra: metadata };
+        }
+
+        const traceId = formattedMeta.traceId || store?.traceId || 'system';
+        const requestId = formattedMeta.requestId || store?.requestId;
         
         logger.log({
             level,
@@ -23,35 +35,35 @@ class StructuredLogger {
             traceId,
             ...(requestId ? { requestId } : {}),
             timestamp: new Date().toISOString(),
-            ...metadata
+            ...formattedMeta
         });
     }
 
     /**
      * Log info level
      */
-    info(message: string, metadata: Record<string, any> = {}): void {
+    info(message: string, metadata: any = {}): void {
         this.log('info', message, metadata);
     }
 
     /**
      * Log error level
      */
-    error(message: string, metadata: Record<string, any> = {}): void {
+    error(message: string, metadata: any = {}): void {
         this.log('error', message, metadata);
     }
 
     /**
      * Log warn level
      */
-    warn(message: string, metadata: Record<string, any> = {}): void {
+    warn(message: string, metadata: any = {}): void {
         this.log('warn', message, metadata);
     }
 
     /**
      * Log debug level
      */
-    debug(message: string, metadata: Record<string, any> = {}): void {
+    debug(message: string, metadata: any = {}): void {
         this.log('debug', message, metadata);
     }
 

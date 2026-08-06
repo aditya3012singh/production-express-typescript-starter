@@ -1,6 +1,6 @@
 import { Worker, Job } from 'bullmq';
 import env from '../config/env.js';
-import logger from '../logger/logger.js';
+import logger from '../logger/structuredLogger.js';
 import EmailService from '../email/email.service.js';
 
 const connectionOptions = {

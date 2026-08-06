@@ -1,5 +1,5 @@
 import amqp from 'amqplib';
-import logger from '../../logger/logger.js';
+import logger from '../../logger/structuredLogger.js';
 import { IEventBus } from '../eventBus.interface.js';
 
 export class RabbitMQEventBus implements IEventBus {

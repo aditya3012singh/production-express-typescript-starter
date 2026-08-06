@@ -1,5 +1,5 @@
 import { createClient, RedisClientType } from 'redis';
-import logger from '../logger/logger.js';
+import logger from '../logger/structuredLogger.js';
 import structuredLogger from '../logger/structuredLogger.js';
 import metricsCollector from '../metrics/metricsCollector.js';
 

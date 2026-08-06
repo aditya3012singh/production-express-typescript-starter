@@ -1,6 +1,6 @@
 import { Redis, RedisOptions } from 'ioredis';
 import env from '../config/env.js';
-import logger from '../logger/logger.js';
+import logger from '../logger/structuredLogger.js';
 
 class RedisClient {
     static client: Redis | null = null;

@@ -1,6 +1,6 @@
 import { Queue } from 'bullmq';
 import env from '../config/env.js';
-import logger from '../logger/logger.js';
+import logger from '../logger/structuredLogger.js';
 
 const connectionOptions = {
     host: env.REDIS_HOST,

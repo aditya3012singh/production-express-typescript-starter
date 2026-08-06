@@ -1,5 +1,5 @@
 import { Kafka, Producer, Consumer } from 'kafkajs';
-import logger from '../../logger/logger.js';
+import logger from '../../logger/structuredLogger.js';
 import { IEventBus } from '../eventBus.interface.js';
 
 export class KafkaEventBus implements IEventBus {

@@ -1,5 +1,5 @@
 import EventEmitter from 'events';
-import logger from '../logger/logger.js';
+import logger from '../logger/structuredLogger.js';
 
 interface MetricSchema {
     totalEventsEmitted: number;
