@@ -10,6 +10,7 @@ import { responseFormatter } from './api/middleware/responseFormatter.js';
 import { timeoutGuard } from './api/middleware/timeout.js';
 import { errorHandler } from './api/middleware/errorHandler.js';
 import { register } from './core/metrics/index.js';
+import { apiRateLimiter } from './api/middleware/rateLimiter.js';
 import AuthRouter from './modules/auth/auth.routes.js';
 import HealthRouter from './core/health/health.routes.js';
 import healthCheckService from './core/health/healthCheck.js';
@@ -77,6 +78,9 @@ app.get('/api/health-check', async (req: TracedRequest, res, next) => {
         });
     }
 });
+
+// Global API Rate Limiter
+app.use('/api/', apiRateLimiter);
 
 // App Router bindings
 app.use('/api/auth', AuthRouter);
