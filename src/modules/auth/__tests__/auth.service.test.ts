@@ -1,7 +1,17 @@
 import { describe, it, expect, vi } from 'vitest';
-import { mockPrisma } from '../../../__tests__/helpers/prisma.mock.js';
+import userRepository from '../repositories/user.repository.js';
 import AuthService from '../auth.service.js';
 import EmailService from '../../../core/email/email.service.js';
+
+// Mock the userRepository
+vi.mock('../repositories/user.repository.js', () => ({
+  default: {
+    findByEmail: vi.fn(),
+    updateByEmail: vi.fn(),
+    findByResetToken: vi.fn(),
+    update: vi.fn()
+  }
+}));
 
 // Mock the email service
 vi.mock('../../../core/email/email.service.js', () => ({
@@ -13,8 +23,8 @@ vi.mock('../../../core/email/email.service.js', () => ({
 describe('AuthService', () => {
   describe('forgotPasswordService', () => {
     it('should return safe message even if user does not exist (prevention of email discovery)', async () => {
-      // Stub findUnique to return null (no user found)
-      mockPrisma.user.findUnique.mockResolvedValue(null);
+      // Stub findByEmail to return null (no user found)
+      vi.mocked(userRepository.findByEmail).mockResolvedValue(null);
 
       const result = await AuthService.forgotPasswordService('nonexistent@example.com');
       
@@ -42,8 +52,8 @@ describe('AuthService', () => {
         lockUntil: null
       };
 
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-      mockPrisma.user.update.mockResolvedValue(mockUser);
+      vi.mocked(userRepository.findByEmail).mockResolvedValue(mockUser);
+      vi.mocked(userRepository.updateByEmail).mockResolvedValue(mockUser);
 
       const result = await AuthService.forgotPasswordService('test@example.com');
 
@@ -55,7 +65,7 @@ describe('AuthService', () => {
 
   describe('resetPasswordService', () => {
     it('should throw bad request error if token is invalid or expired', async () => {
-      mockPrisma.user.findFirst.mockResolvedValue(null);
+      vi.mocked(userRepository.findByResetToken).mockResolvedValue(null);
 
       await expect(
         AuthService.resetPasswordService('invalid-token', 'newPassword123')
@@ -82,19 +92,17 @@ describe('AuthService', () => {
         lockUntil: null
       };
 
-      mockPrisma.user.findFirst.mockResolvedValue(mockUser);
-      mockPrisma.user.update.mockResolvedValue(mockUser);
+      vi.mocked(userRepository.findByResetToken).mockResolvedValue(mockUser);
+      vi.mocked(userRepository.update).mockResolvedValue(mockUser);
 
       const result = await AuthService.resetPasswordService('valid-token', 'newPassword123');
 
       expect(result.message).toContain('Password has been successfully reset.');
-      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+      expect(userRepository.update).toHaveBeenCalledWith(
+        'user-123',
         expect.objectContaining({
-          where: { id: 'user-123' },
-          data: expect.objectContaining({
-            resetPasswordToken: null,
-            resetPasswordExpires: null
-          })
+          resetPasswordToken: null,
+          resetPasswordExpires: null
         })
       );
     });
