@@ -20,7 +20,7 @@ Scaffold a brand-new project instantly from this template without cloning manual
 npx @aditya3012singh/create-base-backend
 ```
 *Select the **TypeScript Edition** inside the interactive prompt, and it will clone, rename, and install everything for you.*
-
+   
 ---
 
 ## 💎 Core Architecture & Features
